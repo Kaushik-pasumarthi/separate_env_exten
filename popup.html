@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 320px;
+      padding: 15px;
+      font-family: 'Courier New', Courier, monospace;
+      background-color: #0d1117;
+      color: #c9d1d9;
+      margin: 0;
+    }
+    h2 {
+      font-size: 16px;
+      color: #00f0ff;
+      border-bottom: 1px solid #30363d;
+      padding-bottom: 8px;
+      margin-top: 0;
+    }
+    .input-group {
+      display: flex;
+      margin-bottom: 15px;
+    }
+    input {
+      flex: 1;
+      background: #161b22;
+      border: 1px solid #30363d;
+      color: #fff;
+      padding: 8px;
+      outline: none;
+    }
+    input:focus {
+      border-color: #00f0ff;
+    }
+    button {
+      background: transparent;
+      border: 1px solid #00f0ff;
+      color: #00f0ff;
+      cursor: pointer;
+      padding: 8px 12px;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: rgba(0, 240, 255, 0.1);
+    }
+    .env-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #161b22;
+      border: 1px solid #30363d;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+    .env-name {
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .controls button {
+      font-size: 12px;
+      padding: 4px 8px;
+      margin-left: 5px;
+    }
+    .btn-pause { border-color: #ff7b72; color: #ff7b72; }
+    .btn-resume { border-color: #3fb950; color: #3fb950; }
+  </style>
+</head>
+<body>
+  <h2>/> Live_Environments</h2>
+
+  <div class="input-group">
+    <input type="text" id="envName" placeholder="e.g., Anime, Research...">
+    <button id="createBtn">Initialize</button>
+  </div>
+
+  <div id="envList"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

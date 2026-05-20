@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Live Environments",
+  "version": "1.0",
+  "description": "Resumable, isolated browser sub-environments.",
+  "permissions": [
+    "tabs",
+    "windows",
+    "storage",
+    "sessions"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Manage Environments"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
