@@ -20,7 +20,7 @@
     }
     .input-group {
       display: flex;
-      margin-bottom: 15px;
+      margin-bottom: 8px;
     }
     input {
       flex: 1;
@@ -33,13 +33,20 @@
     input:focus {
       border-color: #00f0ff;
     }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
     button {
       background: transparent;
       border: 1px solid #00f0ff;
       color: #00f0ff;
       cursor: pointer;
-      padding: 8px 12px;
+      padding: 6px 10px;
       transition: all 0.2s ease;
+      font-size: 12px;
+      flex: 1;
     }
     button:hover {
       background: rgba(0, 240, 255, 0.1);
@@ -58,12 +65,14 @@
       font-size: 14px;
     }
     .controls button {
-      font-size: 12px;
-      padding: 4px 8px;
-      margin-left: 5px;
+      font-size: 11px;
+      padding: 4px 6px;
+      margin-left: 4px;
+      flex: none;
     }
     .btn-pause { border-color: #ff7b72; color: #ff7b72; }
     .btn-resume { border-color: #3fb950; color: #3fb950; }
+    .btn-delete { border-color: #8b949e; color: #8b949e; }
   </style>
 </head>
 <body>
@@ -71,7 +80,11 @@
 
   <div class="input-group">
     <input type="text" id="envName" placeholder="e.g., Anime, Research...">
-    <button id="createBtn">Initialize</button>
+  </div>
+
+  <div class="btn-group">
+    <button id="btnNew">New Window</button>
+    <button id="btnCurrent">Use Current</button>
   </div>
 
   <div id="envList"></div>

@@ -2,22 +2,51 @@
 
 document.addEventListener('DOMContentLoaded', loadEnvironments);
 
-document.getElementById('createBtn').addEventListener('click', async () => {
+// Master function to handle both "New" and "Current" window creation
+async function createEnvironment(isNewWindow) {
   const nameInput = document.getElementById('envName');
   const name = nameInput.value.trim();
   if (!name) return;
 
-  const newWin = await chrome.windows.create({ focused: true });
-
   const data = await chrome.storage.local.get("environments");
   const envs = data.environments || {};
-  // Initialize with empty URL array
-  envs[name] = { windowId: newWin.id, status: 'active', urls: [] };
+
+  // Prevent accidentally overwriting an existing environment
+  if (envs[name]) {
+    alert(`An environment named [${name}] already exists!`);
+    return;
+  }
+
+  let targetWindowId;
+  let initialUrls = [];
+
+  if (isNewWindow) {
+    // Behavior 1: Open a brand new window
+    const newWin = await chrome.windows.create({ focused: true });
+    targetWindowId = newWin.id;
+  } else {
+    // Behavior 2: Capture the current window and scan its tabs immediately
+    const currentWin = await chrome.windows.getCurrent();
+    targetWindowId = currentWin.id;
+
+    const tabs = await chrome.tabs.query({ windowId: targetWindowId });
+    initialUrls = tabs.map(t => t.url).filter(url =>
+      url && !url.startsWith('chrome') && !url.startsWith('about:') && !url.startsWith('edge:')
+    );
+  }
+
+  // Save the environment to the database
+  envs[name] = { windowId: targetWindowId, status: 'active', urls: initialUrls };
   await chrome.storage.local.set({ environments: envs });
 
   nameInput.value = '';
   loadEnvironments();
-});
+}
+
+// Wire up the new buttons
+document.getElementById('btnNew').addEventListener('click', () => createEnvironment(true));
+document.getElementById('btnCurrent').addEventListener('click', () => createEnvironment(false));
+
 
 async function loadEnvironments() {
   const envList = document.getElementById('envList');
@@ -34,10 +63,11 @@ async function loadEnvironments() {
     const tabCount = envData.urls ? envData.urls.length : 0;
 
     el.innerHTML = `
-      <span class="env-name"><span style="color:${statusColor}">●</span> ${name} <span style="font-size:10px; color:#8b949e">[${tabCount} tabs]</span></span>
+      <span class="env-name"><span style="color:${statusColor}">●</span> ${name} <br><span style="font-size:10px; color:#8b949e; font-weight:normal;">[${tabCount} tabs tracked]</span></span>
       <div class="controls">
         <button class="btn-resume" data-name="${name}">Resume</button>
         <button class="btn-pause" data-name="${name}">Pause</button>
+        <button class="btn-delete" data-name="${name}" title="Delete">X</button>
       </div>
     `;
     envList.appendChild(el);
@@ -57,6 +87,18 @@ async function loadEnvironments() {
       resumeEnvironment(name);
     });
   });
+
+  document.querySelectorAll('.btn-delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const name = e.target.dataset.name;
+      if (confirm(`Completely delete the [${name}] environment?`)) {
+        const data = await chrome.storage.local.get("environments");
+        delete data.environments[name];
+        await chrome.storage.local.set({ environments: data.environments });
+        loadEnvironments();
+      }
+    });
+  });
 }
 
 async function pauseEnvironment(windowId) {
@@ -71,7 +113,6 @@ async function pauseEnvironment(windowId) {
   }
 }
 
-// THE ULTIMATE RESURRECTION ENGINE
 async function resumeEnvironment(envName) {
   try {
     const data = await chrome.storage.local.get("environments");
@@ -90,52 +131,52 @@ async function resumeEnvironment(envName) {
       await chrome.windows.update(envData.windowId, { state: 'normal', focused: true });
     }
   } catch (error) {
-    // FINGERPRINT PROTOCOL: Chrome broke the ID or we closed multiple windows
-    console.warn(`[${envName}] Native resume failed. Engaging Fingerprint Protocol...`);
+    const errorMsg = error.message || "";
 
-    const data = await chrome.storage.local.get("environments");
-    const envData = data.environments[envName];
-    const savedUrls = envData.urls || [];
+    if (errorMsg.includes("No window with id") || errorMsg.includes("GHOST") || errorMsg.includes("Invalid session id")) {
+      console.warn(`[${envName}] Native resume failed. Engaging Fingerprint Protocol...`);
 
-    try {
-      const sessions = await chrome.sessions.getRecentlyClosed({ maxResults: 15 });
-      let targetSessionId = null;
+      const data = await chrome.storage.local.get("environments");
+      const envData = data.environments[envName];
+      const savedUrls = envData.urls || [];
 
-      // 1. Search the graveyard for our fingerprint (Do these closed tabs match our saved URLs?)
-      for (let s of sessions) {
-        if (s.window && s.window.tabs) {
-          const sessionUrls = s.window.tabs.map(t => t.url);
-          // If we find a window where at least one major URL matches, it's our guy
-          const hasMatch = sessionUrls.some(url => savedUrls.includes(url) && !url.startsWith('chrome'));
-          if (hasMatch) {
-            targetSessionId = s.window.sessionId;
-            break;
+      try {
+        const sessions = await chrome.sessions.getRecentlyClosed({ maxResults: 15 });
+        let targetSessionId = null;
+
+        for (let s of sessions) {
+          if (s.window && s.window.tabs) {
+            const sessionUrls = s.window.tabs.map(t => t.url);
+            const hasMatch = sessionUrls.some(url => savedUrls.includes(url) && !url.startsWith('chrome'));
+            if (hasMatch) {
+              targetSessionId = s.window.sessionId;
+              break;
+            }
           }
         }
+
+        if (targetSessionId) {
+          console.log("Fingerprint match found! Restoring true session.");
+          const restored = await chrome.sessions.restore(targetSessionId);
+          envData.windowId = restored.window.id;
+        } else if (savedUrls.length > 0) {
+          console.warn("Session permanently purged by Chrome. Rebuilding from memory.");
+          const newWin = await chrome.windows.create({ url: savedUrls, focused: true });
+          envData.windowId = newWin.id;
+        } else {
+          throw new Error("No URLs saved.");
+        }
+
+        envData.status = 'active';
+        delete envData.sessionId;
+        await chrome.storage.local.set({ environments: data.environments });
+        loadEnvironments();
+
+      } catch (fatalError) {
+        alert(`CRITICAL: Environment ${envName} could not be recovered.`);
       }
-
-      if (targetSessionId) {
-        // True Resurrection
-        console.log("Fingerprint match found! Restoring true session.");
-        const restored = await chrome.sessions.restore(targetSessionId);
-        envData.windowId = restored.window.id;
-      } else if (savedUrls.length > 0) {
-        // Ultimate Failsafe Rebuild
-        console.warn("Session permanently purged by Chrome. Rebuilding from memory.");
-        const newWin = await chrome.windows.create({ url: savedUrls, focused: true });
-        envData.windowId = newWin.id;
-      } else {
-        throw new Error("No URLs saved.");
-      }
-
-      // Update Database
-      envData.status = 'active';
-      delete envData.sessionId;
-      await chrome.storage.local.set({ environments: data.environments });
-      loadEnvironments();
-
-    } catch (fatalError) {
-      alert(`CRITICAL: Environment ${envName} could not be recovered.`);
+    } else {
+      console.error("Window state update failed:", errorMsg);
     }
   }
 }
